@@ -1,0 +1,214 @@
+#!/bin/sh
+export POSIXLY_CORRECT=yes
+
+run_editor() {
+# Funkce pro spusteni editoru, parametr je spousteny soubor
+
+	# Spusteni editoru v promenne editor
+	if [ ! -z "$EDITOR" ]; then
+		$EDITOR $1
+	# Spusteni editoru v promenne visual
+	elif [ ! -z "$VISUAL" ]; then
+		$VISUAL $1
+	# Spusteni editoru vi
+	else 
+		vi $1
+	fi
+}
+
+# Kontrola, zda existuje utilita realpath
+if [ -z `command -v realpath` ]; then 
+	>&2 echo "[Error] Utilita realpath neni dostupna!"
+	exit 1
+fi 
+
+# Kontrola, zda je nastavena promenna WEDI_RC 
+if [ -z "$WEDI_RC" ]; then
+	>&2 echo "[Error] Promenna neni nastavena"
+	exit 1
+fi
+
+if [ ! -f $WEDI_RC ]; then
+	mkdir -p $(dirname $WEDI_RC)
+	touch $WEDI_RC
+fi
+
+# Smazani neexistujicich souboru z listu
+for line in `cat $WEDI_RC | awk '{ print $2 }'`; do
+	if [ ! -f $line ]; then
+		# smaze radky, ktere odpovidaji neexistujicimu souboru"
+		$(sed -i "\|$line|d" $WEDI_RC > /dev/null 2>&1)
+		
+		if [ "$?" == "1" ]; then
+			$(sed -i "" "\|$line|d" $WEDI_RC > /dev/null 2>&1)
+		fi
+	fi
+done
+
+
+# Handling options a, b with a parameter, c.
+params=0
+while getopts :mlba o
+do      case "$o" in
+	m)      params=1;;
+	l)      params=1;;
+	b)      params=1;;
+	a)	params=1;;
+	esac
+done
+
+# V aktualnim adresari se bude vyhledavat a spusti se posledni zde zmeneny soubor
+if [ $# -eq 0 ]; then
+	pocet_editu=`grep "$(realpath .) " $WEDI_RC | wc -l`
+	if [ "$pocet_editu" -eq "0" ]; then
+		>&2 echo "[Error] V adresari jeste nebyl editovan zadny soubor!"
+		exit 1
+	fi
+
+	file=`grep "$(realpath .) " $WEDI_RC | tail -n 1 | awk '{print $2}'`
+
+	# Zapsani informace o spusteni souboru do WEDI_RC (adresar soubor timestamp)
+	echo -n "`realpath .` $file $(date +%s)" >> $WEDI_RC
+	echo "" >> $WEDI_RC
+
+	run_editor $file
+
+# Bude se editovat soubor, nejde o adrear
+elif [ $# -eq 1 ] && [ $params -eq 0 ] && [ ! -d $1 ]; then
+	# TODO asi nevytvaret cestu k souboru, nechat na editoru, nevytvaret ani soubor
+	if [ ! -f $1 ]; then
+		mkdir -p `dirname $1` #edited, check if its correct
+		touch $1 2>/dev/null 
+		if [ "$?" == "1" ]; then
+			2>&1 echo "[Error] Doslo k chybe. Pravdepodobne jste zadali neexistujici adresar."
+			exit 1
+		fi
+		
+		imagine_path=`realpath $1` 
+		echo -n "$(dirname $imagine_path) $imagine_path $(date +%s)" >> $WEDI_RC
+		echo "" >> $WEDI_RC
+		rm $1
+	
+		run_editor $imagine_path
+	else 
+		echo -n "$(dirname `realpath $1`) $(realpath $1) $(date +%s)" >> $WEDI_RC
+		echo "" >> $WEDI_RC
+	
+		run_editor $(realpath $1) 
+	fi
+
+# Jde o adresar, bude se vyhledavat a spusti se posledni zmeneny soubor v adresari
+elif [ $# -eq 1 ] && [ $params -eq 0 ] && [ -d $1 ]; then
+	
+	pocet_editu=`grep "$(realpath $1) " $WEDI_RC | wc -l`
+	if [ "$pocet_editu" -eq "0" ]; then
+		>&2 echo "[Error] V adresari jeste nebyl editovan zadny soubor!"
+		exit 1
+	fi
+
+	file=`grep "$(realpath $1) " $WEDI_RC | tail -n 1 | awk '{print $2}'`
+
+	# Zapsani informace o spusteni souboru do WEDI_RC (adresar soubor timestamp)
+	echo -n "`realpath $1` $file $(date +%s)" >> $WEDI_RC
+	echo "" >> $WEDI_RC
+
+	run_editor $file
+
+# Moznost s parametrem -l - zobrazeni seznamu vsech souboru, ktere jsme editovali
+# Pouze argument -l bez zadaneho adresare
+elif [ $# -eq 1 ] && [ $params -eq 1 ] && [ "$1" == "-l" ]; then
+
+	for file in `grep "$(realpath .) " $WEDI_RC | awk '{print $2}' | sort -u`; do
+		basename "$file"
+	done
+
+# Argument -l se zadanym adresarem
+elif [ $# -eq 2 ] && [ $params -eq 1 ] && [ "$1" == "-l" ] && [ -d $2 ]; then
+	
+	for file in `grep "$(realpath $2) " $WEDI_RC | awk '{print $2}' | sort -u`; do
+		basename "$file"
+	done
+
+# Moznost s argumentem -m - vyber souboru, ktery byl editovan nejcasteji
+# Pouze argument -m bez zadaneho adresare
+elif [ $# -eq 1 ] && [ $params -eq 1 ] && [ "$1" == "-m" ]; then
+
+	pocet_editu=`grep "$(realpath .) " $WEDI_RC | wc -l`
+	if [ "$pocet_editu" -eq "0" ]; then
+		>&2 echo "[Error] V adresari jeste nebyl editovan zadny soubor!"
+		exit 1
+	fi
+
+	# Vybere soubor, ktery byl v aktualnim adresari editovan nejcasteji (vyskytuje se v souboru wedi_rc nejvicekrat)
+	file=`grep "$(realpath .) " $WEDI_RC | awk '{print $2}' | sort | uniq -c | sort -r | head -1 | xargs | cut -d" " -f2-`
+	
+	run_editor $(realpath $file)
+
+# Argument -m se zadanym adresarem
+elif [ $# -eq 2 ] && [ $params -eq 1 ] && [ "$1" == "-m" ] && [ -d $2 ]; then
+
+	pocet_editu=`grep "$(realpath $2) " $WEDI_RC | wc -l`
+	if [ "$pocet_editu" -eq "0" ]; then
+		>&2 echo "[Error] V adresari jeste nebyl editovan zadny soubor!"
+		exit 1
+	fi
+
+	# Vybere se soubor, ktery byl ve vybranem adresari editovan nejcasteji
+        file=`grep "$(realpath $2) " $WEDI_RC | awk '{print $2}' | sort | uniq -c | sort -r | head -1 | xargs | cut -d" " -f2-`
+
+        run_editor $(realpath $file)
+
+# Moznost s argumentem -b | -a DATUM s adresarem nebo bez
+# Argument -b bez adresare, zobrazi seznam souboru v aktualnim adresari  editovanych pred zadanym datem v case 00:00:00 vcetne
+elif [ $# -eq 2 ]  && [ $params -eq 1 ] && [ "$1" == "-b" ]; then 
+	# Vypisou se soubory editovane pred zadanym casem
+	user_time=$(date -d "$2" "+%s" 2>/dev/null)
+		
+		if [ "$?" == "1" ]; then
+			user_time=$(gdate -d "$2" "+%s")
+		fi
+
+	# TODO upraveno, zkontrolovat, zda nyni odpovida zadani a pak kdyztak zmenit u vsech nebo vratit
+	for file in `grep "$(realpath .) " $WEDI_RC | awk -v utime=$user_time '( utime >= $3 ) {print  $2;}' | sort -u`; do
+		basename $file
+	done
+# Argument -b s adresarem
+elif [ $# -eq 3 ] && [ $params -eq 1 ] && [ "$1" == "-b" ] && [ -d $3 ]; then
+	# Vypisou se soubory editovane pred zadanym casem v konkretni slozce
+	user_time=$(date -d "$2" "+%s" 2>/dev/null)
+	
+		if [ "$?" == "1" ]; then
+			user_time=$(gdate -d "$2" "+%s")
+		fi
+
+	#`grep "$(realpath $3) " $WEDI_RC | sort -rut' ' -k3,3 | awk '!seen[$2]++' | awk -v utime=$user_time '( utime >= $3 ) {print  $2;}'`
+	for file in `grep "$(realpath $3) " $WEDI_RC | awk -v utime=$user_time '( utime >= $3 ) {print  $2;}' | sort -u`; do
+		basename $file
+	done
+
+# Zadan parametr -a bez adresare
+# Vypisou se soubory editovane po zadanem casu v aktualnim adresari
+elif [ $# -eq 2 ]  && [ $params -eq 1 ] && [ "$1" == "-a" ]; then 
+	user_time=$(date -d "$2" "+%s" 2>/dev/null)
+
+		if [ "$?" == "1" ]; then
+			user_time=$(gdate -d "$2" "+%s")
+		fi
+
+	for file in `grep "$(realpath .) " $WEDI_RC | awk -v utime=$user_time '( utime <= $3 ) {print  $2;}' | sort -u`; do
+		basename $file
+	done
+# Parametr -a s adresarem
+elif [ $# -eq 3 ] && [ $params -eq 1 ] && [ "$1" == "-a" ] && [ -d $3 ]; then
+	user_time=$(date -d "$2" "+%s" 2>/dev/null)
+
+		if [ "$?" == "1" ]; then
+			user_time=$(gdate -d "$2" "+%s")
+		fi
+
+	for file in `grep "$(realpath $3) " $WEDI_RC | awk -v utime=$user_time '( utime <= $3 ) {print  $2;}' | sort -u`; do
+		basename $file
+	done
+else
+	>&2 echo "[Error] Neplatny vstup programu!!!"
+fi
