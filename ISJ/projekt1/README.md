@@ -4,7 +4,7 @@ Dopište definici regulárního výrazu word_parse tak, aby do skupin rozdělova
 Například ve vstupu:
 ```python
 bee(P: insect honey) dog  cat (P:milk) ant(P) ape
-´´´
+```
 jsou slova 'dog' a 'ape' prvního typu,
 s 'bee' je asociováno 'insect honey'
 s 'ant' nic (prázdný řetězec)
