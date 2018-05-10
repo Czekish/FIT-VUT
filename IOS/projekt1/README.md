@@ -27,20 +27,20 @@ adresáře vybere soubor pro editaci. Výběr souboru je následující.
 • Pokud byl zadán argument -b resp.-a (before, after), skript zobrazí seznam souborů, které byly editovány před resp. po zadaném datu v čase 00:00:00.0 včetně.
 • DATUM je formátu YYYY-MM-DD.
 
-###NASTAVENÍ A KONFIGURACE
+### NASTAVENÍ A KONFIGURACE
 • Skript si pamatuje informace o svém spouštění v souboru, který je dán proměnnou WEDI_RC. Formát souboru není specifikován.
 • Pokud není proměnná nastavena, jedná se o chybu
 • Pokud soubor na cestě dané proměnnou WEDI_RC neexistuje, soubor bude vytvořen včetně cesty k danému souboru (pokud i ta neexistuje).
 • Skript spouští editor, který je nastaven v proměnné EDITOR. Pokud není proměnná EDITOR nastavená, respektuje proměnnou VISUAL. Pokud ani ta není nastavená, použije se příkaz vi.
 
-###NÁVRATOVÁ HODNOTA
+### NÁVRATOVÁ HODNOTA
 • Skript vrací úspěch v případě úspěšné operace nebo v případě úspěšné editace. Pokud editor vrátí chybu, skript vrátí stejný chybový návratový kód. Interní chyba skriptu bude doprovázena chybovým hlášením. 
 
-###POZNÁMKY
+### POZNÁMKY
 • Skript nebere v potaz soubory, se kterými dříve počítal a které jsou nyní smazané.
 • Při rozhodování relativní cesty adresáře je doporučené používat reálnou cestu (realpath). Důvod např.: $ wedi . $ wedi ‘pwd‘.
 
-##Implementační detaily
+## Implementační detaily
 • Skript by měl mít v celém běhu nastaveno POSIXLY_CORRECT=yes.
 • Skript by měl běžet na všech běžných shellech (dash, ksh, bash). Můžete použít GNU rozšíření pro sed či awk. Jazyk Perl nebo Python povolen není.
 • Skript by měl ošetřit i chybový případ, že na daném stroji utilita realpath není dostupná.
